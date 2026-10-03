@@ -9,6 +9,22 @@ internet ───► cloudflared (tunnel) ┼──► n8n :5678 ──► Post
 tu máquina ─► 127.0.0.1:5678 ──────┘
 ```
 
+## Instálalo con Claude Code (recomendado)
+
+Deja que Claude Code lo gestione todo por ti. Te hará las preguntas necesarias (dónde instalarlo,
+tu dominio, tu email…) y te dará los pasos claros. Nunca te pedirá contraseñas ni claves:
+los secretos los genera él directamente en tu equipo o servidor.
+
+1. Instala [Docker Desktop](https://www.docker.com/products/docker-desktop/) y [Claude Code](https://docs.claude.com/en/docs/claude-code/overview).
+2. Abre una terminal en una carpeta vacía y ejecuta `claude`.
+3. Pega este prompt:
+
+```text
+Quiero autoalojar n8n con Docker. Clona https://github.com/bitclicklabs/n8n-autoalojado en una subcarpeta llamada n8n-autoalojado, lee su archivo SETUP-CLAUDE.md y sigue esas instrucciones de principio a fin. Pregúntame lo que necesites, de una en una, pero nunca me pidas contraseñas, tokens ni claves.
+```
+
+Si prefieres hacerlo a mano, sigue leyendo.
+
 ## Antes de empezar
 
 - Docker con Docker Compose (Docker Desktop en local; en el VPS, `curl -fsSL https://get.docker.com | sh`).
