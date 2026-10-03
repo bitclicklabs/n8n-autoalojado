@@ -1,14 +1,12 @@
 # n8n autoalojado con Docker — BitclickLabs
 
-Stack del vídeo "Autoalójate n8n" (parte 1): n8n + Postgres, con webhooks públicos,
-conexión a Claude como MCP y la red y la base de datos ya preparadas para Langfuse (parte 2).
+Stack del vídeo "Autoalójate n8n": n8n + Postgres en Docker, con webhooks públicos
+y conexión a Claude como MCP. Funciona en local o en un VPS propio.
 
 ```
-                      ┌──────────── red ai-stack (compartida con Langfuse en la parte 2) ───────────┐
-internet ─► Caddy (vps) ─┐                                                                          │
-internet ─► cloudflared ─┼─► n8n :5678 ──► Postgres (bases de datos n8n + langfuse)                 │
-tu máquina ─► 127.0.0.1:5678 ┘                                                                      │
-                      └─────────────────────────────────────────────────────────────────────────────┘
+internet ───► Caddy (perfil vps) ──┐
+internet ───► cloudflared (tunnel) ┼──► n8n :5678 ──► Postgres
+tu máquina ─► 127.0.0.1:5678 ──────┘
 ```
 
 ## Antes de empezar
@@ -33,8 +31,8 @@ cp .env.example .env
    Si el comando no muestra nada, el `.env` está completo (las líneas comentadas de los bloques que no usas también cuentan: bórralas o rellénalas).
 4. Guarda `N8N_ENCRYPTION_KEY` en tu gestor de contraseñas. Si la pierdes, pierdes todas las credenciales de n8n.
 
-> **Importante:** rellena `LANGFUSE_DB_PASSWORD` ahora. `init-data.sh` solo se ejecuta la primera
-> vez que arranca Postgres; si lo dejas para la parte 2, tendrás que crear la base de datos a mano.
+> **Importante:** `init-data.sh` solo se ejecuta la primera vez que arranca Postgres. Si cambias
+> las contraseñas de Postgres después, borra el volumen `postgres_data` o cámbialas a mano en la base de datos.
 
 ## 2. Arranca
 
@@ -107,25 +105,6 @@ usa un túnel SSH: `ssh -L 5678:127.0.0.1:5678 root@IP_DEL_VPS`.
 > **Nota:** el nombre exacto del menú y de la ruta de la URL cambia entre versiones de n8n.
 > Copia siempre la URL de la pantalla de n8n en lugar de escribirla a mano.
 
-## 5. Preparado para Langfuse (parte 2)
-
-Lo que ya queda hecho:
-
-- La red Docker `ai-stack`. El compose de Langfuse se une a ella con:
-
-  ```yaml
-  networks:
-    ai-stack:
-      external: true
-  ```
-
-- La base de datos `langfuse` y su usuario en el mismo Postgres. Langfuse se conecta con
-  `postgresql://langfuse:<LANGFUSE_DB_PASSWORD>@postgres:5432/langfuse`.
-
-> **Importante:** Langfuse v3 autoalojado necesita, además de Postgres, ClickHouse, Redis y un
-> almacenamiento S3 (MinIO). En un VPS de 4 GB de RAM junto a n8n va justo. Antes de grabar la
-> parte 2, mide el consumo con `docker stats` o valora Langfuse Cloud para la demo.
-
 ## Mantenimiento
 
 ```bash
@@ -137,3 +116,7 @@ docker compose exec -T postgres pg_dump -U postgres n8n > backup-n8n-$(date +%F)
 ```
 
 Una copia de la base de datos no sirve sin la `N8N_ENCRYPTION_KEY` que corresponde a esos datos.
+
+## Licencia
+
+[MIT](LICENSE). Úsalo, cámbialo y móntalo para tus clientes.

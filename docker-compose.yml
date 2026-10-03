@@ -1,7 +1,7 @@
-# n8n autoalojado — BitclickLabs (vídeo "Autoalójate n8n", parte 1)
+# n8n autoalojado — BitclickLabs (vídeo "Autoalójate n8n")
 #
 # Servicios:
-#   postgres    → base de datos de n8n (y, en la parte 2, de Langfuse)
+#   postgres    → base de datos de n8n
 #   n8n         → el editor + webhooks
 #   caddy       → HTTPS automático en un VPS        (perfil: vps)
 #   cloudflared → túnel para webhooks en local      (perfil: tunnel)
@@ -26,9 +26,6 @@ services:
       # Los lee init-data.sh en el primer arranque
       - POSTGRES_NON_ROOT_USER=${POSTGRES_NON_ROOT_USER}
       - POSTGRES_NON_ROOT_PASSWORD=${POSTGRES_NON_ROOT_PASSWORD}
-      - LANGFUSE_DB_NAME=${LANGFUSE_DB_NAME:-}
-      - LANGFUSE_DB_USER=${LANGFUSE_DB_USER:-}
-      - LANGFUSE_DB_PASSWORD=${LANGFUSE_DB_PASSWORD:-}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-data.sh:/docker-entrypoint-initdb.d/init-data.sh:ro
@@ -40,7 +37,6 @@ services:
     # Sin `ports:` — Postgres nunca se publica en el host
     networks:
       - n8n_net
-      - ai_stack
 
   n8n:
     image: docker.n8n.io/n8nio/n8n:${N8N_IMAGE_TAG:-stable}
@@ -90,7 +86,6 @@ services:
         condition: service_healthy
     networks:
       - n8n_net
-      - ai_stack
 
   caddy:
     image: caddy:2
@@ -131,9 +126,4 @@ volumes:
 
 networks:
   n8n_net:
-    driver: bridge
-  # Red compartida para la parte 2: el docker-compose de Langfuse se une a ella
-  # declarando `ai-stack` como red externa y llega a n8n y a Postgres por nombre.
-  ai_stack:
-    name: ai-stack
     driver: bridge
