@@ -1,0 +1,21 @@
+# Caddy: HTTPS automático (Let's Encrypt) delante de n8n. Solo perfil "vps".
+# Requisitos: el registro DNS A de N8N_HOST apunta a la IP del VPS
+# y los puertos 80 y 443 están abiertos (firewall del VPS y del panel de IONOS).
+
+{
+	email {$SSL_EMAIL}
+}
+
+{$N8N_HOST} {
+	reverse_proxy n8n:5678 {
+		# Sin buffer: el editor de n8n usa SSE/websockets para la ejecución en vivo
+		flush_interval -1
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}

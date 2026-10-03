@@ -1,0 +1,3 @@
+# init-data.sh se ejecuta dentro de Linux: con finales CRLF (Windows) Postgres falla al arrancar
+*.sh text eol=lf
+Caddyfile text eol=lf

@@ -1,0 +1,139 @@
+# n8n autoalojado — BitclickLabs (vídeo "Autoalójate n8n", parte 1)
+#
+# Servicios:
+#   postgres    → base de datos de n8n (y, en la parte 2, de Langfuse)
+#   n8n         → el editor + webhooks
+#   caddy       → HTTPS automático en un VPS        (perfil: vps)
+#   cloudflared → túnel para webhooks en local      (perfil: tunnel)
+#
+# Uso:
+#   Local, solo tú:            docker compose up -d
+#   Local + webhooks públicos: docker compose --profile tunnel up -d
+#   VPS con dominio y HTTPS:   docker compose --profile vps up -d
+#
+# Los secretos viven SOLO en .env (copia de .env.example). Nunca los pongas aquí.
+
+name: video-n8n
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      # Los lee init-data.sh en el primer arranque
+      - POSTGRES_NON_ROOT_USER=${POSTGRES_NON_ROOT_USER}
+      - POSTGRES_NON_ROOT_PASSWORD=${POSTGRES_NON_ROOT_PASSWORD}
+      - LANGFUSE_DB_NAME=${LANGFUSE_DB_NAME:-}
+      - LANGFUSE_DB_USER=${LANGFUSE_DB_USER:-}
+      - LANGFUSE_DB_PASSWORD=${LANGFUSE_DB_PASSWORD:-}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-data.sh:/docker-entrypoint-initdb.d/init-data.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # Sin `ports:` — Postgres nunca se publica en el host
+    networks:
+      - n8n_net
+      - ai_stack
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:${N8N_IMAGE_TAG:-stable}
+    restart: unless-stopped
+    # Solo en 127.0.0.1: accesible desde tu máquina (o un túnel SSH), nunca desde internet.
+    # En el VPS el tráfico público entra por Caddy.
+    ports:
+      - "127.0.0.1:${N8N_LOCAL_PORT:-5678}:5678"
+    environment:
+      # --- base de datos ---
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+      - DB_POSTGRESDB_USER=${POSTGRES_NON_ROOT_USER}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_NON_ROOT_PASSWORD}
+      # --- URL pública: sin esto los webhooks salen como http://localhost:5678 ---
+      - N8N_HOST=${N8N_HOST}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=${N8N_PROTOCOL}
+      - N8N_EDITOR_BASE_URL=${N8N_PUBLIC_URL}
+      - WEBHOOK_URL=${N8N_PUBLIC_URL}
+      - N8N_PROXY_HOPS=${N8N_PROXY_HOPS:-0}
+      - N8N_SECURE_COOKIE=${N8N_SECURE_COOKIE:-true}
+      # --- zona horaria (nodos Schedule/Cron) ---
+      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
+      - TZ=${GENERIC_TIMEZONE}
+      - NODE_ENV=production
+      # --- la clave que cifra TODAS tus credenciales: haz copia fuera del servidor ---
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      # --- valores seguros por defecto ---
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_PERSONALIZATION_ENABLED=false
+      - N8N_HIRING_BANNER_ENABLED=false
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=true
+      - N8N_RUNNERS_ENABLED=true
+      - N8N_DEFAULT_BINARY_DATA_MODE=filesystem
+      # --- que la base de datos no crezca para siempre ---
+      - EXECUTIONS_DATA_PRUNE=true
+      - EXECUTIONS_DATA_MAX_AGE=336
+      - EXECUTIONS_DATA_PRUNE_MAX_COUNT=50000
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./local_files:/files
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - n8n_net
+      - ai_stack
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    profiles: ["vps"]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - N8N_HOST=${N8N_HOST}
+      - SSL_EMAIL=${SSL_EMAIL}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - n8n
+    networks:
+      - n8n_net
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    profiles: ["tunnel"]
+    # El túnel se configura en el panel de Cloudflare (Zero Trust → Networks → Tunnels)
+    # con el destino http://n8n:5678
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - n8n
+    networks:
+      - n8n_net
+
+volumes:
+  postgres_data:
+  n8n_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  n8n_net:
+    driver: bridge
+  # Red compartida para la parte 2: el docker-compose de Langfuse se une a ella
+  # declarando `ai-stack` como red externa y llega a n8n y a Postgres por nombre.
+  ai_stack:
+    name: ai-stack
+    driver: bridge

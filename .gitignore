@@ -1,0 +1,6 @@
+.env
+.env.*
+!.env.example
+local_files/
+# material interno de grabación
+guion-gancho.md
